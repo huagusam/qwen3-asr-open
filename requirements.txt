@@ -1,0 +1,10 @@
+torch
+torchaudio
+gradio
+loguru
+numpy
+soundfile
+webrtcvad
+torchao
+flash-attn
+qwen_asr

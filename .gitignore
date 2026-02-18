@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 模型文件（太大，不应上传）
+models/
+*.pth
+*.bin
+*.safetensors
+*.ckpt
+
+# 日志和缓存
+*.log
+.cache/
+.huggingface/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 音频文件（可选）
+*.wav
+*.mp3
+*.flac
+
+# 环境变量
+.env
