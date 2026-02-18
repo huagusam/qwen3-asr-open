@@ -28,14 +28,11 @@ import gradio as gr
 from loguru import logger
 from qwen3_asr_handler import (
     Qwen3ASRHandler,
-    scan_comfy_models,
     scan_local_models,
     GLOBAL_VRAM_CONFIG,
     auto_detect_precision,
     auto_detect_flash_attention,
-    get_optimal_chunk_size,
-    download_model,
-    DEFAULT_MODEL_DIR
+    get_optimal_chunk_size
 )
 
 # ==========================================
@@ -60,20 +57,6 @@ def initialize_service(model_dir, model_name, device, precision, quantization, c
         flash_attention=flash_attention
     )
     return status
-
-def download_and_init(model_dir, model_id, device, precision, quantization, compile_model, flash_attention):
-    """Download model and initialize"""
-    try:
-        logger.info(f"Downloading model: {model_id}")
-        model_path = download_model(model_id, model_dir)
-        if model_path:
-            logger.info(f"Model downloaded to: {model_path}")
-            return initialize_service(model_dir, os.path.basename(model_path), device, precision, quantization, compile_model, flash_attention)
-        else:
-            return "❌ Download failed"
-    except Exception as e:
-        logger.exception("Download failed")
-        return f"❌ Error: {str(e)}"
 
 def transcribe_audio(audio_file, language, chunk_size, overlap):
     """Transcribe uploaded audio file"""
@@ -104,85 +87,68 @@ def transcribe_audio(audio_file, language, chunk_size, overlap):
 
 def create_ui():
     """Create Gradio Interface"""
-    with gr.Blocks(title="Qwen3-ASR Open Source") as demo:
-        gr.Markdown("# 🎤 Qwen3-ASR Open Source Transcriber")
-        gr.Markdown(f"### 🖥️ Detected GPU: {GLOBAL_VRAM_CONFIG.tier} ({GLOBAL_VRAM_CONFIG.gpu_memory_gb:.1f} GB)")
+    with gr.Blocks(title="Qwen3-ASR") as demo:
+        gr.Markdown("# 🎤 Qwen3-ASR 语音识别")
+        gr.Markdown(f"### 🖥️ GPU: {GLOBAL_VRAM_CONFIG.tier} ({GLOBAL_VRAM_CONFIG.gpu_memory_gb:.1f} GB)")
         
         with gr.Row():
             with gr.Column():
-                gr.Markdown("### ⚙️ Configuration")
+                gr.Markdown("### ⚙️ 配置")
                 
                 # 模型目录
                 model_dir_input = gr.Textbox(
-                    label="Model Directory",
-                    value=DEFAULT_MODEL_DIR,
-                    info="Path to store/download models"
+                    label="模型目录",
+                    value="./models",
+                    info="存放模型文件的文件夹路径"
                 )
                 
-                # 模型选择方式
-                model_source = gr.Radio(
-                    choices=["local", "huggingface"],
-                    value="local",
-                    label="Model Source"
-                )
-                
-                # 本地模型
-                refresh_btn = gr.Button("🔄 Refresh Local Models")
+                # 刷新模型列表
+                refresh_btn = gr.Button("🔄 刷新模型")
                 model_list = scan_local_models(model_dir_input.value)
                 model_dropdown = gr.Dropdown(
                     choices=model_list,
-                    label="Local Model",
-                    value=model_list[0] if model_list else None,
-                    visible=True
+                    label="选择模型",
+                    value=model_list[0] if model_list else None
                 )
-                
-                # HuggingFace 模型
-                hf_model_id = gr.Textbox(
-                    label="HuggingFace Model ID",
-                    value="Qwen/Qwen3-ASR",
-                    info="e.g., Qwen/Qwen3-ASR",
-                    visible=False
-                )
-                download_btn = gr.Button("📥 Download from HuggingFace", visible=False)
                 
                 # 设备配置
                 device_dropdown = gr.Dropdown(
                     choices=["auto", "cuda", "cpu"],
                     value="auto",
-                    label="Device"
+                    label="运行设备"
                 )
                 
                 precision_dropdown = gr.Dropdown(
                     choices=["auto", "bf16", "fp16", "fp32"],
                     value="auto",
-                    label="Precision"
+                    label="计算精度"
                 )
                 
                 quant_dropdown = gr.Dropdown(
                     choices=["none", "int8_weight_only", "fp8_weight_only"],
                     value="int8_weight_only",
-                    label="Quantization (TorchAO)"
+                    label="量化 (TorchAO)"
                 )
                 
                 compile_check = gr.Checkbox(
-                    label="Enable torch.compile (Not recommended with Quantization)", 
+                    label="启用 torch.compile (量化时不建议启用)", 
                     value=False
                 )
                 flash_check = gr.Checkbox(
-                    label="Enable Flash Attention", 
+                    label="启用 Flash Attention", 
                     value=auto_detect_flash_attention()
                 )
                 
-                init_btn = gr.Button("🚀 Initialize Service", variant="primary")
-                init_status = gr.Textbox(label="Status", interactive=False)
+                init_btn = gr.Button("🚀 初始化模型", variant="primary")
+                init_status = gr.Textbox(label="状态", interactive=False)
             
             with gr.Column():
-                gr.Markdown("### 🎵 Transcription")
-                audio_input = gr.Audio(type="filepath", label="Upload Audio")
+                gr.Markdown("### 🎵 转录")
+                audio_input = gr.Audio(type="filepath", label="上传音频")
                 lang_dropdown = gr.Dropdown(
                     choices=["auto", "Chinese", "English", "Japanese", "Korean"],
                     value="auto",
-                    label="Language"
+                    label="语言"
                 )
                 
                 recommended_chunk = get_optimal_chunk_size()
@@ -190,13 +156,13 @@ def create_ui():
                     0, 300, 
                     value=recommended_chunk, 
                     step=5, 
-                    label=f"Chunk Size (seconds, 0=auto, Recommended: {recommended_chunk}s)"
+                    label=f"分块大小 (秒，0=自动，推荐：{recommended_chunk}s)"
                 )
-                overlap_slider = gr.Slider(0, 10, value=2, step=1, label="Overlap (seconds)")
+                overlap_slider = gr.Slider(0, 10, value=2, step=1, label="重叠 (秒)")
                 
-                transcribe_btn = gr.Button("📝 Transcribe", variant="primary")
-                text_output = gr.Textbox(label="Transcription Text", lines=10)
-                timestamp_output = gr.Textbox(label="Info", lines=5)
+                transcribe_btn = gr.Button("📝 开始转录", variant="primary")
+                text_output = gr.Textbox(label="转录结果", lines=10)
+                timestamp_output = gr.Textbox(label="信息", lines=5)
         
         # ==========================================
         # 事件绑定
@@ -205,25 +171,7 @@ def create_ui():
             models = scan_local_models(dir)
             return gr.Dropdown(choices=models, value=models[0] if models else None)
         
-        def toggle_model_source(source):
-            if source == "local":
-                return gr.update(visible=True), gr.update(visible=False)
-            else:
-                return gr.update(visible=False), gr.update(visible=True)
-        
-        model_source.change(
-            fn=toggle_model_source,
-            inputs=[model_source],
-            outputs=[model_dropdown, hf_model_id]
-        )
-        
         refresh_btn.click(fn=refresh_models, inputs=[model_dir_input], outputs=[model_dropdown])
-        
-        download_btn.click(
-            fn=download_and_init,
-            inputs=[model_dir_input, hf_model_id, device_dropdown, precision_dropdown, quant_dropdown, compile_check, flash_check],
-            outputs=[init_status]
-        )
         
         init_btn.click(
             fn=initialize_service,
@@ -240,22 +188,21 @@ def create_ui():
     return demo
 
 def main():
-    parser = argparse.ArgumentParser(description="Qwen3-ASR Open Source Gradio App")
-    parser.add_argument("--port", type=int, default=7860, help="Gradio port")
-    parser.add_argument("--share", action="store_true", help="Create public link")
+    parser = argparse.ArgumentParser(description="Qwen3-ASR Gradio App")
+    parser.add_argument("--port", type=int, default=7860, help="Gradio 端口")
+    parser.add_argument("--share", action="store_true", help="创建公共链接")
     parser.add_argument(
         "--model_dir",
         type=str,
-        default=DEFAULT_MODEL_DIR,
-        help="Default model directory"
+        default="./models",
+        help="默认模型目录"
     )
     args = parser.parse_args()
     
-    logger.info(f"GPU Tier: {GLOBAL_VRAM_CONFIG.tier} ({GLOBAL_VRAM_CONFIG.gpu_memory_gb:.1f} GB)")
-    logger.info(f"Default Precision: {auto_detect_precision()}")
-    logger.info(f"Flash Attention Available: {auto_detect_flash_attention()}")
-    logger.info(f"Recommended Chunk Size: {get_optimal_chunk_size()}s")
-    logger.info(f"Model Directory: {args.model_dir}")
+    logger.info(f"GPU: {GLOBAL_VRAM_CONFIG.tier} ({GLOBAL_VRAM_CONFIG.gpu_memory_gb:.1f} GB)")
+    logger.info(f"默认精度：{auto_detect_precision()}")
+    logger.info(f"Flash Attention: {auto_detect_flash_attention()}")
+    logger.info(f"推荐分块大小：{get_optimal_chunk_size()}s")
 
     demo = create_ui()
     demo.launch(

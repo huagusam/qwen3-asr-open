@@ -7,4 +7,4 @@ soundfile
 webrtcvad
 torchao
 flash-attn
-qwen_asr
+qwen-asr

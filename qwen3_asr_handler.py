@@ -1,5 +1,5 @@
 """
-Qwen3-ASR VAD-Aware Handler (Open Source Version)
+Qwen3-ASR VAD-Aware Handler
 基于语音活动检测的智能分块，消除重复问题
 """
 import torch
@@ -15,11 +15,6 @@ from collections import OrderedDict
 from typing import Optional, Dict, Any, Tuple, List, Union
 from dataclasses import dataclass
 from loguru import logger
-
-# ==========================================
-# 默认配置
-# ==========================================
-DEFAULT_MODEL_DIR = os.path.join(os.path.expanduser("~"), ".qwen3_asr", "models")
 
 # ==========================================
 # 依赖检查
@@ -138,7 +133,6 @@ class VADProcessor:
         split_points = [0]
         target_samples = int(self.config.target_chunk_sec * sample_rate)
         max_samples = int(self.config.max_chunk_sec * sample_rate)
-        min_samples = int(self.config.min_chunk_sec * sample_rate)
         
         current_start = 0
         
@@ -370,45 +364,14 @@ def scan_local_models(model_dir: str) -> List[str]:
     if not os.path.exists(model_dir):
         os.makedirs(model_dir, exist_ok=True)
         logger.info(f"Created model directory: {model_dir}")
-        return ["No Models Found - Please download first"]
+        return ["No Models Found"]
     
     for item in os.listdir(model_dir):
         item_path = os.path.join(model_dir, item)
         if os.path.isdir(item_path):
             models.append(item)
     
-    return sorted(models) if models else ["No Models Found - Please download first"]
-
-def scan_comfy_models(model_dir: str) -> List[str]:
-    """Scan ComfyUI-style model directory for Qwen3-ASR models"""
-    models = []
-    if not os.path.exists(model_dir):
-        logger.warning(f"Model directory not found: {model_dir}")
-        return models
-    for item in os.listdir(model_dir):
-        item_path = os.path.join(model_dir, item)
-        if os.path.isdir(item_path) and "Qwen3-ASR" in item:
-            models.append(item)
     return sorted(models) if models else ["No Models Found"]
-
-def download_model(model_id: str, model_dir: str) -> Optional[str]:
-    """Download model from HuggingFace"""
-    try:
-        from huggingface_hub import snapshot_download
-        
-        os.makedirs(model_dir, exist_ok=True)
-        
-        local_path = snapshot_download(
-            repo_id=model_id,
-            local_dir=model_dir,
-            local_dir_use_symlinks=False
-        )
-        
-        logger.info(f"Model downloaded to: {local_path}")
-        return local_path
-    except Exception as e:
-        logger.error(f"Download failed: {e}")
-        return None
 
 def auto_detect_precision() -> str:
     if not torch.cuda.is_available():
